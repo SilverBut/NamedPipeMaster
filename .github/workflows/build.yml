@@ -1,0 +1,47 @@
+name: Build
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: windows-latest
+    permissions:
+      contents: read
+
+    strategy:
+      matrix:
+        configuration: [Release]
+        platform: [x64, Win32]
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Add MSBuild to PATH
+      uses: microsoft/setup-msbuild@v2
+
+    - name: Install Windows Driver Kit
+      run: choco install windows-driver-kit -y
+
+    - name: Build solution
+      run: msbuild NamedPipeMaster.sln /p:Configuration=${{ matrix.configuration }} /p:Platform=${{ matrix.platform }} /m
+
+    - name: Determine output directory
+      id: outdir
+      shell: pwsh
+      run: |
+        if ("${{ matrix.platform }}" -eq "x64") {
+          echo "path=x64/${{ matrix.configuration }}" >> $env:GITHUB_OUTPUT
+        } else {
+          echo "path=${{ matrix.configuration }}" >> $env:GITHUB_OUTPUT
+        }
+
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: NamedPipeMaster-${{ matrix.configuration }}-${{ matrix.platform }}
+        path: ${{ steps.outdir.outputs.path }}
+        if-no-files-found: error
